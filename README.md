@@ -8,6 +8,7 @@ Dépôt public et indépendant consacré à la **spécification, aux tests diff�
 
 - [Cahier des charges — Safe Native, sécurité et compatibilité API](docs/cahier-des-charges.md)
 - [Matrice de tests détaillée et critères d'acceptation](docs/matrice-de-tests.md)
+- [Rapport initial : 630 vérifications / 3 scénarios incompatibles](docs/rapport-initial.md)
 
 ## Méthode
 
@@ -17,4 +18,4 @@ Comparer une application Symfony **clean** avec une application équivalente **a
 
 Les scénarios sont **à exécuter** tant qu'un rapport de CI daté et vérifiable n'est pas publié. Les assertions critiques doivent faire échouer les jobs en cas de violation. Les actions actives et tests de résistance sont limités à des environnements isolés appartenant aux responsables du projet. Aucun test destructif ou de charge n'est exécuté sur des services tiers.
 
-**Projet en phase de spécification.** Les résultats historiques d'un banc de comparaison précédent ne constituent pas la validation de la présente matrice.
+**Phase de laboratoire en cours.** 21 scénarios sont désormais exécutables sur cinq configurations PHP/Symfony ; la CI échoue volontairement lorsqu'une incompatibilité est reproduite. Les autres scénarios de la matrice restent non exécutés. Voir le rapport initial.
