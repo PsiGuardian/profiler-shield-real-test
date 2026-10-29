@@ -1,6 +1,8 @@
 <?php
 declare(strict_types=1);
 require dirname(__DIR__).'/vendor/autoload.php';
+// Kernel error handlers on some Symfony branches may emit content; keep JSON reports machine-readable.
+ob_start();
 use RealTest\Matrix\{Context,HttpProbes,StateProbes};
 
 $strict=in_array('--strict',$argv,true);
@@ -68,5 +70,7 @@ $report=[
  'duration_ms'=>round((hrtime(true)-$allStart)/1e6,1),'results'=>$results
 ];
 if(count($results)!==504){fwrite(STDERR,"Incomplete matrix execution\n");exit(2);}
+$unexpectedOutput=ob_get_clean();
+if($unexpectedOutput!=='')fwrite(STDERR,'Suppressed non-JSON fixture output bytes: '.strlen($unexpectedOutput).PHP_EOL);
 echo json_encode($report,JSON_PRETTY_PRINT|JSON_UNESCAPED_SLASHES|JSON_INVALID_UTF8_SUBSTITUTE|JSON_PARTIAL_OUTPUT_ON_ERROR),PHP_EOL;
 if($strict && $p0Unsatisfied)exit(1);
