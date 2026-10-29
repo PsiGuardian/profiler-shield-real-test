@@ -15,7 +15,7 @@ final class TestKernel extends Kernel {
  }
  public function registerContainerConfiguration(LoaderInterface $loader):void{
   $loader->load(function(ContainerBuilder $c){
-   $c->loadFromExtension('framework',['secret'=>'test-only-non-production-secret','router'=>['resource'=>__DIR__.'/Routes.php','type'=>'php'],'profiler'=>['collect'=>false],'session'=>['storage_factory_id'=>'session.storage.factory.mock_file']]);
+   $c->loadFromExtension('framework',['secret'=>'test-only-non-production-secret','router'=>['resource'=>__DIR__.'/routes.php','type'=>'php'],'profiler'=>['collect'=>false],'session'=>['storage_factory_id'=>'session.storage.factory.mock_file']]);
    if($this->guarded)$c->loadFromExtension('web_profiler',['toolbar'=>true]);
    $c->register('real_test.api_exception',ApiExceptionSubscriber::class)->addTag('kernel.event_subscriber');
   });
