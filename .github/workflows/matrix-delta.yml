@@ -1,0 +1,54 @@
+name: Full matrix Safe Native comparative regression
+on:
+  push:
+    branches: [feature/safe-native-prototype-v3]
+  pull_request:
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  baseline-versus-experimental:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - { php: '8.3', symfony: '5.4' }
+          - { php: '8.3', symfony: '6.4' }
+          - { php: '8.3', symfony: '7.4' }
+          - { php: '8.4', symfony: '7.4' }
+          - { php: '8.4', symfony: '8.1' }
+    steps:
+      - uses: actions/checkout@v4
+      - uses: shivammathur/setup-php@v2
+        with:
+          php-version: ${{ matrix.php }}
+          tools: composer:v2
+          extensions: openssl, mbstring, xml, curl, zip, tokenizer
+          coverage: none
+      - name: Select Symfony version on disposable runner
+        env:
+          SYMFONY_BRANCH: ${{ matrix.symfony }}
+        run: |
+          php -r '$p=json_decode(file_get_contents("composer.json"),true);foreach($p["require"] as $k=>$v)if(str_starts_with($k,"symfony/"))$p["require"][$k]=getenv("SYMFONY_BRANCH").".*";file_put_contents("composer.json",json_encode($p,JSON_PRETTY_PRINT).PHP_EOL);'
+      - run: composer update --no-plugins --no-scripts --no-interaction --prefer-dist --no-progress
+      - name: Lint scripts
+        run: php -l bin/matrix84.php && php -l bin/compare_matrix.php
+      - name: Produce separate unmodified-bundle and prototype matrices
+        run: |
+          mkdir -p reports
+          php bin/matrix84.php > reports/baseline.json
+          php bin/matrix84.php --prototype > reports/prototype.json
+      - name: Verify no previously passing scenario regressed
+        run: |
+          php bin/compare_matrix.php reports/baseline.json reports/prototype.json > reports/delta.json
+          php -r '$r=json_decode(file_get_contents("reports/delta.json"),true);if(!is_array($r)||($r["variants"]??0)!==504)exit(2);echo "IMPROVED=".($r["improved_evaluations"]??0)." REGRESSED=".($r["regressed_evaluations"]??0)." STILL_FAIL=".($r["still_failed_evaluations"]??0)." NOT_RUN=".($r["still_not_run_evaluations"]??0).PHP_EOL;'
+      - name: Preserve reproducible full reports
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: safe-native-delta-php${{ matrix.php }}-symfony${{ matrix.symfony }}
+          path: reports/
+          if-no-files-found: warn
+          retention-days: 14

@@ -17,7 +17,7 @@ final class Context {
  public TestKernel $guard;
  public string $password;
  public string $portal;
- public function __construct(public string $root,public string $mode,public bool $debug) {
+ public function __construct(public string $root,public string $mode,public bool $debug,public bool $prototype=false) {
   $this->portal='/internal/lab-'.bin2hex(random_bytes(18));
   $vars=[
    'GUARDIAN_STORAGE_DIR'=>$root.'/vault','GUARDIAN_ENCRYPTION_KEY'=>bin2hex(random_bytes(32)),
@@ -35,7 +35,7 @@ final class Context {
   self::env('REAL_TEST_GUARDED','0');
   $this->clean=new TestKernel($root,false,$debug);$this->clean->boot();
   self::env('REAL_TEST_GUARDED','1');
-  $this->guard=new TestKernel($root,true,$debug);$this->guard->boot();
+  $this->guard=new TestKernel($root,true,$debug,$prototype);$this->guard->boot();
  }
  public static function env(string $key,string $value):void{$_SERVER[$key]=$_ENV[$key]=$value;putenv($key.'='.$value);}
  public function http(bool $guardian,string $method,string $path,string $accept='application/json',array $headers=[],array $cookies=[],array $post=[]):array {

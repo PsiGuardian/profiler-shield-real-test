@@ -14,7 +14,8 @@
     "autoload": {
         "psr-4": {
             "RealTest\\Fixture\\": "tests/Fixture/",
-            "RealTest\\Matrix\\": "tests/Matrix/"
+            "RealTest\\Matrix\\": "tests/Matrix/",
+            "RealTest\\Prototype\\": "tests/Prototype/"
         }
     },
     "minimum-stability": "stable",
@@ -23,6 +24,7 @@
         "audit:report": "@php bin/compare.php",
         "audit:gate": "@php bin/compare.php --strict",
         "audit:matrix": "@php bin/matrix84.php",
-        "audit:matrix:gate": "@php bin/matrix84.php --strict"
+        "audit:matrix:gate": "@php bin/matrix84.php --strict",
+        "audit:prototype": "@php bin/prototype.php"
     }
 }

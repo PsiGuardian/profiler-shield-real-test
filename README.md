@@ -10,6 +10,8 @@ Dépôt public et indépendant consacré à la **spécification, aux tests diff�
 - [Matrice de tests détaillée et critères d'acceptation](docs/matrice-de-tests.md)
 - [Rapport initial : 630 vérifications / 3 scénarios incompatibles](docs/rapport-initial.md)
 - [Audit approfondi : 84 scénarios, 2520 évaluations, transport réel et fuzzing](docs/rapport-84-approfondi.md)
+- [Phase 3 — Résultats du prototype Safe Native et de la concurrence](docs/rapport-phase3.md)
+- [Plan d'intégration sécurisée (sans modifier le bundle original)](docs/plan-integration-safe-native.md)
 
 ## Méthode
 
