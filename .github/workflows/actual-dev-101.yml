@@ -94,6 +94,22 @@ jobs:
           set -euo pipefail
           php bin/compare_releases.php reports/baseline.json reports/candidate.json > reports/comparison.json
           php -r '$r=json_decode(file_get_contents("reports/comparison.json"),true);if(!is_array($r)||($r["variants"]??0)!==504)exit(2);echo "Symfony ".$r["symfony_version"]." PHP ".$r["php_version"]."; source ".$r["candidate_sha"];echo "PASS gains: ".$r["improved"]."; regressions: ".$r["regressed"]."; remaining FAIL: ".$r["remaining_failed"]."; NOT_RUN: ".$r["remaining_not_run"].PHP_EOL;echo "Candidate P0 unsatisfied: ".implode(", ",$r["candidate_p0_unsatisfied"]).PHP_EOL;'
+      - name: Exercise real HTTP HEAD, SSE, streams and CORS with actual dev code
+        working-directory: candidate
+        env:
+          REAL_TEST_DEV_MAPPER: '1'
+        run: php bin/wire.php --strict > ../reports/wire.json
+
+      - name: Run 900 seeded HTTP mutations against actual dev code
+        working-directory: candidate
+        env:
+          REAL_TEST_DEV_MAPPER: '1'
+        run: php bin/fuzz.php > ../reports/fuzz.json
+
+      - name: Enforce no denied profiler access, leaks or business regressions in fuzz
+        working-directory: candidate
+        run: php bin/fuzz_gate.php ../reports/fuzz.json
+
       - name: Preserve complete JSON evidence even on failure
         if: always()
         uses: actions/upload-artifact@v4
