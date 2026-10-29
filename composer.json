@@ -11,7 +11,7 @@
     },
     "autoload": {
         "psr-4": {
-            "RealTest\\": "tests/Fixture/"
+            "RealTest\\Fixture\\": "tests/Fixture/"
         }
     },
     "minimum-stability": "stable",
