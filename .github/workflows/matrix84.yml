@@ -48,5 +48,8 @@ jobs:
           path: reports/matrix84.json
           if-no-files-found: warn
           retention-days: 14
+      - name: Explain every non-pass scenario and validate report envelope
+        run: |
+          php -r '$raw=file_get_contents("reports/matrix84.json");$a=json_decode($raw,true);echo "JSON error: ".json_last_error_msg().PHP_EOL;echo "Schema: ".($a["schema"]??"missing")." Scenarios: ".($a["scenarios_declared"]??"missing")." Observed: ".($a["executions_observed"]??"missing").PHP_EOL;foreach(($a["scenario_summary"]??[]) as $r){if($r["aggregate"]==="PASS")continue;$entry=null;foreach(($a["results"]??[]) as $t){if($t["test_id"]===$r["test_id"]&&$t["status"]!=="PASS"){$entry=$t;break;}}echo $r["test_id"]." ".$r["aggregate"]." : ".implode("; ",array_slice(($entry["reasons"]??[]),0,3)).PHP_EOL;}'
       - name: Fail CI on P0 regression or missing test
         run: php bin/gate.php reports/matrix84.json
