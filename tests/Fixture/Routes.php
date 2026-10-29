@@ -16,6 +16,21 @@ final class Routes {
   foreach($definitions as [$name,$path,$method,$verbs])$routes->add($name,$path)->controller([ApiController::class,$method])->methods($verbs);
   $routes->add('api_throw','/api/throw/{kind}')->controller([ApiController::class,'thrown'])->methods(['GET']);
   $routes->add('legitimate_doc','/docs/_profiler/guide')->controller([ApiController::class,'health'])->methods(['GET']);
+
+  $deep=[
+    ['deep_status','/api/status/{code}','status',['GET']],
+    ['deep_nested','/api/nested','nested',['GET']],
+    ['deep_cors','/api/cors','cors',['OPTIONS']],
+    ['deep_cors_error','/api/cors-error','corsError',['GET']],
+    ['deep_304','/api/not-modified','response304',['GET']],
+    ['deep_cookie','/api/cookie','cookie',['POST']],
+    ['deep_sse','/api/sse','sse',['GET']],
+    ['deep_html_error','/web/error','htmlError',['GET']],
+    ['deep_html_headers','/web/error-headers','htmlErrorHeaders',['GET']],
+    ['deep_html_trusted','/web/trusted','htmlTrusted',['GET']],
+    ['deep_post','/api/create/{id}','post',['POST']]
+  ];
+  foreach($deep as [$name,$path,$method,$verbs])$routes->add($name,$path)->controller([DeepController::class,$method])->methods($verbs);
   if(($_SERVER['REAL_TEST_GUARDED']??'')==='1'){
    $bundle=new \Symfony\Bundle\WebProfilerBundle\WebProfilerBundle();
    $path=$bundle->getPath().'/Resources/config/routing/';
