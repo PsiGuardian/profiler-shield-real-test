@@ -43,6 +43,8 @@ final class Context {
   foreach($headers as $name=>$value)$server[strtoupper(str_replace('-','_','HTTP_'.$name))]=$value;
   $req=Request::create('https://localhost'.$path,$method,$post,$cookies,[],$server);
   $kernel=$guardian?$this->guard:$this->clean;
+  // Symfony may load routes lazily: keep the fixture routing selector aligned with the active kernel.
+  self::env('REAL_TEST_GUARDED',$guardian?'1':'0');
   $res=$kernel->handle($req);
   $body=$res->getContent();
   if($res instanceof StreamedResponse){ob_start();$res->sendContent();$body=ob_get_clean();}
