@@ -35,13 +35,15 @@ jobs:
       - name: Install unmodified release
         run: composer update --no-plugins --no-scripts --no-interaction --prefer-dist --no-progress
       - name: Validate syntax
-        run: php -l bin/lifecycle.php && php -l bin/auth_e2e.php
+        run: php -l bin/lifecycle.php && php -l bin/auth_e2e.php && php -l bin/fault_injection.php
       - name: Actual setup, uninstall, purge and host-data preservation
         run: |
           mkdir -p reports
           php bin/lifecycle.php > reports/lifecycle.json
       - name: End-to-end authentication and failure behavior
         run: php bin/auth_e2e.php > reports/auth_e2e.json
+      - name: Inject runtime failures in Guardian and Symfony error handling
+        run: php bin/fault_injection.php > reports/fault_injection.json
       - name: Preserve reports even if a test fails
         if: always()
         uses: actions/upload-artifact@v4
@@ -53,4 +55,4 @@ jobs:
       - name: Strict report gate
         if: always()
         run: |
-          php -r 'foreach(["lifecycle"=>6,"auth_e2e"=>10] as $file=>$expected){$p="reports/$file.json";$x=json_decode((string)@file_get_contents($p),true);if(!is_array($x)){echo "Invalid or missing $p".PHP_EOL;exit(2);}echo "$file ".($x["passed"]??"?")."/".($x["scenarios"]??"?")." passed".PHP_EOL;foreach(($x["tests"]??$x["results"]??[]) as $t)if($t["status"]!=="PASS")echo $t["id"]." : ".implode("; ",$t["reasons"]).PHP_EOL;if(($x["scenarios"]??0)!==$expected||($x["passed"]??0)!==$expected)exit(1);}'
+          php -r 'foreach(["lifecycle"=>6,"auth_e2e"=>10,"fault_injection"=>7] as $file=>$expected){$p="reports/$file.json";$x=json_decode((string)@file_get_contents($p),true);if(!is_array($x)){echo "Invalid or missing $p".PHP_EOL;exit(2);}echo "$file ".($x["passed"]??"?")."/".($x["scenarios"]??"?")." passed".PHP_EOL;foreach(($x["tests"]??$x["results"]??[]) as $t)if($t["status"]!=="PASS")echo $t["id"]." : ".implode("; ",$t["reasons"]).PHP_EOL;if(($x["scenarios"]??0)!==$expected||($x["passed"]??0)!==$expected)exit(1);}'
