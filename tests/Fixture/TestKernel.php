@@ -10,13 +10,13 @@ final class TestKernel extends Kernel {
  public function getLogDir():string{return $this->root.'/logs';}
  public function registerBundles():iterable{
   $bundles=[new \Symfony\Bundle\FrameworkBundle\FrameworkBundle()];
-  if($this->guarded){$bundles[]=new \Symfony\Bundle\WebProfilerBundle\WebProfilerBundle();$bundles[]=new \OmegaGuardian\ProfilerShield\OmegaGuardianProfilerShieldBundle();}
+  if($this->guarded){$bundles[]=new \Symfony\Bundle\TwigBundle\TwigBundle();$bundles[]=new \Symfony\Bundle\WebProfilerBundle\WebProfilerBundle();$bundles[]=new \OmegaGuardian\ProfilerShield\OmegaGuardianProfilerShieldBundle();}
   return $bundles;
  }
  public function registerContainerConfiguration(LoaderInterface $loader):void{
   $loader->load(function(ContainerBuilder $c){
    $c->loadFromExtension('framework',['secret'=>'test-only-non-production-secret','router'=>['resource'=>__DIR__.'/routes.php','type'=>'php'],'profiler'=>['collect'=>false],'session'=>['storage_factory_id'=>'session.storage.factory.mock_file']]);
-   if($this->guarded)$c->loadFromExtension('web_profiler',['toolbar'=>true]);
+   if($this->guarded){$c->loadFromExtension('twig',['default_path'=>__DIR__]);$c->loadFromExtension('web_profiler',['toolbar'=>true]);}
    $c->register('real_test.api_exception',ApiExceptionSubscriber::class)->addTag('kernel.event_subscriber');
   });
  }
