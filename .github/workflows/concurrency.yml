@@ -1,0 +1,51 @@
+name: Cross-process storage and throttle safety
+on:
+  push:
+    branches: [feature/safe-native-prototype-v3]
+  pull_request:
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  race:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - { php: '8.3', symfony: '5.4' }
+          - { php: '8.3', symfony: '6.4' }
+          - { php: '8.3', symfony: '7.4' }
+          - { php: '8.4', symfony: '7.4' }
+          - { php: '8.4', symfony: '8.1' }
+    steps:
+      - uses: actions/checkout@v4
+      - uses: shivammathur/setup-php@v2
+        with:
+          php-version: ${{ matrix.php }}
+          tools: composer:v2
+          extensions: openssl, mbstring, xml, curl, zip, tokenizer
+          coverage: none
+      - name: Pin Symfony for disposable CI environment
+        env:
+          SYMFONY_BRANCH: ${{ matrix.symfony }}
+        run: |
+          php -r '$p=json_decode(file_get_contents("composer.json"),true);foreach($p["require"] as $k=>$v)if(str_starts_with($k,"symfony/"))$p["require"][$k]=getenv("SYMFONY_BRANCH").".*";file_put_contents("composer.json",json_encode($p,JSON_PRETTY_PRINT).PHP_EOL);'
+      - run: composer update --no-plugins --no-scripts --no-interaction --prefer-dist --no-progress
+      - run: php -l bin/concurrency.php && php -l tests/Workers/race.php
+      - name: Exercise 960 concurrent encrypted transactions and 24 login attempts
+        run: |
+          mkdir -p reports
+          php bin/concurrency.php > reports/concurrency.json
+      - name: Preserve complete redacted test artifact
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: concurrency-php${{ matrix.php }}-symfony${{ matrix.symfony }}
+          path: reports/concurrency.json
+          if-no-files-found: warn
+          retention-days: 14
+      - name: Validate worker counts and secure throttle boundary
+        run: |
+          php -r '$r=json_decode(file_get_contents("reports/concurrency.json"),true);if(!is_array($r)||($r["total_increment_operations"]??0)!==960||($r["throttle_requests"]??0)!==24)exit(2);echo "status=".($r["status"]??"UNKNOWN")." assertions=".($r["assertions"]??0).PHP_EOL;foreach(($r["errors"]??[]) as $v)echo "FAIL ".$v.PHP_EOL;exit(($r["status"]??"")!=="PASS"?1:0);'
