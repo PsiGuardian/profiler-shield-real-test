@@ -1,0 +1,120 @@
+name: Actual dev-1.0.1 versus released v1.0.0 (84 scenarios)
+on:
+  push:
+    branches: [feature/validate-actual-dev-1.0.1]
+  pull_request:
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  actual-dev-differential:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - { php: '8.3', symfony: '5.4' }
+          - { php: '8.3', symfony: '6.4' }
+          - { php: '8.3', symfony: '7.4' }
+          - { php: '8.4', symfony: '7.4' }
+          - { php: '8.4', symfony: '8.1' }
+    steps:
+      - name: Checkout independent test laboratory
+        uses: actions/checkout@v4
+      - name: Checkout real target bundle dev-1.0.1
+        uses: actions/checkout@v4
+        with:
+          repository: PsiGuardian/profiler-shield
+          ref: dev-1.0.1
+          path: _bundle_dev
+          persist-credentials: false
+      - name: Record actual Git SHA from target branch
+        id: source
+        shell: bash
+        run: |
+          set -euo pipefail
+          sha="$(git -C _bundle_dev rev-parse HEAD)"
+          test "${#sha}" -eq 40
+          printf 'sha=%s\n' "$sha" >> "$GITHUB_OUTPUT"
+          echo "Real dev-1.0.1 source: $sha"
+      - uses: shivammathur/setup-php@v2
+        with:
+          php-version: ${{ matrix.php }}
+          tools: composer:v2
+          extensions: openssl, mbstring, xml, curl, zip, tokenizer
+          coverage: none
+      - name: Create disjoint baseline and candidate workspaces
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p baseline candidate reports
+          rsync -a --exclude='.git/' --exclude='_bundle_dev/' --exclude='baseline/' --exclude='candidate/' --exclude='reports/' ./ baseline/
+          rsync -a --exclude='.git/' --exclude='_bundle_dev/' --exclude='baseline/' --exclude='candidate/' --exclude='reports/' ./ candidate/
+          php baseline/bin/configure_release.php baseline '${{ matrix.symfony }}'
+          php candidate/bin/configure_release.php candidate '${{ matrix.symfony }}'
+      - name: Install released v1.0.0 exclusively from Packagist
+        working-directory: baseline
+        run: composer update --no-plugins --no-scripts --no-interaction --prefer-dist --no-progress
+      - name: Install actual dev branch from checked-out Git SHA
+        working-directory: candidate
+        run: composer update --no-plugins --no-scripts --no-interaction --prefer-dist --no-progress
+      - name: Verify installed code is the real checked-out bundle
+        shell: bash
+        run: |
+          set -euo pipefail
+          php -r 'require "baseline/vendor/autoload.php";$v=\Composer\InstalledVersions::getPrettyVersion("omegaguardian/profiler-shield");echo "Baseline installed: ".$v.PHP_EOL;if(!in_array($v,["1.0.0","v1.0.0"],true))exit(2);'
+          php -r 'require "candidate/vendor/autoload.php";$v=\Composer\InstalledVersions::getPrettyVersion("omegaguardian/profiler-shield");echo "Candidate installed: ".$v.PHP_EOL;if($v!=="1.0.1-dev")exit(2);'
+          src="$(sha256sum _bundle_dev/src/EventListener/PrivacySubscriber.php | cut -d' ' -f1)"
+          dst="$(sha256sum candidate/vendor/omegaguardian/profiler-shield/src/EventListener/PrivacySubscriber.php | cut -d' ' -f1)"
+          test "$src" = "$dst"
+          echo 'Verified exact checked-out Guardian bundle code; prototype adapter disabled by runner.'
+      - name: Lint comparison runners and candidate fixture
+        run: |
+          php -l baseline/bin/matrix84.php
+          php -l candidate/bin/matrix84.php
+          php -l candidate/tests/Fixture/TrustedApiErrorMapper.php
+          php -l bin/compare_releases.php
+      - name: Measure 84 cases against unmodified published v1.0.0
+        working-directory: baseline
+        env:
+          LAB_RELEASE_ID: v1.0.0
+          REAL_TEST_DEV_MAPPER: '0'
+        run: php bin/matrix84.php > ../reports/baseline.json
+      - name: Measure same 84 cases against actual dev-1.0.1 code
+        working-directory: candidate
+        env:
+          LAB_RELEASE_ID: dev-1.0.1
+          LAB_RELEASE_SHA: ${{ steps.source.outputs.sha }}
+          REAL_TEST_DEV_MAPPER: '1'
+        run: php bin/matrix84.php > ../reports/candidate.json
+      - name: Compare results; fail on any PASS regression
+        shell: bash
+        run: |
+          set -euo pipefail
+          php bin/compare_releases.php reports/baseline.json reports/candidate.json > reports/comparison.json
+          php -r '$r=json_decode(file_get_contents("reports/comparison.json"),true);if(!is_array($r)||($r["variants"]??0)!==504)exit(2);echo "Symfony ".$r["symfony_version"]." PHP ".$r["php_version"]."; source ".$r["candidate_sha"];echo "PASS gains: ".$r["improved"]."; regressions: ".$r["regressed"]."; remaining FAIL: ".$r["remaining_failed"]."; NOT_RUN: ".$r["remaining_not_run"].PHP_EOL;echo "Candidate P0 unsatisfied: ".implode(", ",$r["candidate_p0_unsatisfied"]).PHP_EOL;'
+      - name: Exercise real HTTP HEAD, SSE, streams and CORS with actual dev code
+        working-directory: candidate
+        env:
+          REAL_TEST_DEV_MAPPER: '1'
+        run: php bin/wire.php --strict > ../reports/wire.json
+
+      - name: Run 900 seeded HTTP mutations against actual dev code
+        working-directory: candidate
+        env:
+          REAL_TEST_DEV_MAPPER: '1'
+        run: php bin/fuzz.php > ../reports/fuzz.json
+
+      - name: Enforce no denied profiler access, leaks or business regressions in fuzz
+        working-directory: candidate
+        run: php bin/fuzz_gate.php ../reports/fuzz.json
+
+      - name: Preserve complete JSON evidence even on failure
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: actual-dev-101-php${{ matrix.php }}-symfony${{ matrix.symfony }}
+          path: reports/
+          if-no-files-found: warn
+          retention-days: 30

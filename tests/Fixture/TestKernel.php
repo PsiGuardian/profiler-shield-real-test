@@ -18,6 +18,12 @@ final class TestKernel extends Kernel {
    $c->loadFromExtension('framework',['secret'=>'test-only-non-production-secret','router'=>['resource'=>__DIR__.'/routes.php','type'=>'php'],'profiler'=>['collect'=>false],'session'=>['storage_factory_id'=>'session.storage.factory.mock_file']]);
    if($this->guarded){$c->loadFromExtension('twig',['default_path'=>__DIR__]);$c->loadFromExtension('web_profiler',['toolbar'=>true]);}
    $c->register('real_test.api_exception',ApiExceptionSubscriber::class)->addTag('kernel.event_subscriber');
+   // Only the dev-1.0.1 candidate has the tagged public mapper interface.
+   // The released 1.0.0 baseline keeps its original unmodified registration.
+   if($this->guarded && ($_SERVER['REAL_TEST_DEV_MAPPER']??'0')==='1'){
+     $c->register('real_test.approved_domain_error',TrustedApiErrorMapper::class)
+       ->addTag('omega_guardian.public_error_mapper',['priority'=>100]);
+   }
    if($this->guarded && $this->prototype){
      $c->register('real_test.safe_native_subscriber',\RealTest\Prototype\SafeNativeSubscriber::class)->addTag('kernel.event_subscriber');
    }
