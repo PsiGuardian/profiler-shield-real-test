@@ -63,7 +63,9 @@ $perId=[];foreach($specs as $s){
 $p0Unsatisfied=array_values(array_filter($perId,static fn($s)=>$s['priority']==='P0'&&$s['aggregate']!=='PASS'));
 $report=[
  'schema'=>2,'suite'=>'Profiler Shield independent 84-scenario security and API matrix',
- 'source'=>'tests/catalog.json','release'=>'omegaguardian/profiler-shield ~1.0.0',
+ 'source'=>'tests/catalog.json','release'=>getenv('LAB_RELEASE_ID')?:'unspecified',
+ 'source_commit'=>getenv('LAB_RELEASE_SHA')?:null,
+ 'installed_package_version'=>\Composer\InstalledVersions::getPrettyVersion('omegaguardian/profiler-shield'),
  'test_only_prototype'=>$prototype,
  'symfony_version'=>\Symfony\Component\HttpKernel\Kernel::VERSION,'php_version'=>PHP_VERSION,
  'modes'=>['native','generic','custom'],'debug_states'=>[false,true],
