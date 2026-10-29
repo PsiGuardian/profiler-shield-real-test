@@ -1,0 +1,25 @@
+{
+    "name": "psiguardian/profiler-shield-real-test",
+    "description": "Isolated, reproducible black-box differential compatibility tests for Symfony and OmegaGuardian Profiler Shield",
+    "type": "project",
+    "license": "MIT",
+    "require": {
+        "php": "^8.3",
+        "symfony/framework-bundle": "^5.4 || ^6.4 || ^7.4 || ~8.1.0",
+        "symfony/web-profiler-bundle": "^5.4 || ^6.4 || ^7.4 || ~8.1.0",
+        "omegaguardian/profiler-shield": "~1.0.0",
+        "symfony/yaml": "^5.4 || ^6.4 || ^7.4 || ~8.1.0",
+        "symfony/twig-bundle": "^5.4 || ^6.4 || ^7.4 || ~8.1.0"
+    },
+    "autoload": {
+        "psr-4": {
+            "RealTest\\Fixture\\": "tests/Fixture/"
+        }
+    },
+    "minimum-stability": "stable",
+    "prefer-stable": true,
+    "scripts": {
+        "audit:report": "@php bin/compare.php",
+        "audit:gate": "@php bin/compare.php --strict"
+    }
+}
