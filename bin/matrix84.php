@@ -6,6 +6,7 @@ ob_start();
 use RealTest\Matrix\{Context,HttpProbes,StateProbes};
 
 $strict=in_array('--strict',$argv,true);
+$prototype=in_array('--prototype',$argv,true);
 $catalog=json_decode((string)file_get_contents(dirname(__DIR__).'/tests/catalog.json'),true,512,JSON_THROW_ON_ERROR);
 $specs=$catalog['scenarios']??[];
 if(count($specs)!==84||count(array_unique(array_column($specs,'id')))!==84){fwrite(STDERR,"Incomplete or duplicated test catalogue\n");exit(2);}
@@ -19,7 +20,7 @@ foreach(['native','generic','custom'] as $mode) {
   if(!mkdir($root,0700,true)){fwrite(STDERR,"Cannot allocate test root\n");exit(2);}
   $ctx=null;
   try {
-   $ctx=new Context($root,$mode,$debug);
+   $ctx=new Context($root,$mode,$debug,$prototype);
    foreach($specs as $spec){
     $id=$spec['id'];$start=hrtime(true);
     $result=str_starts_with($id,'AUTH-')||str_starts_with($id,'FAULT-')||str_starts_with($id,'DOCTOR-')?
@@ -63,6 +64,7 @@ $p0Unsatisfied=array_values(array_filter($perId,static fn($s)=>$s['priority']===
 $report=[
  'schema'=>2,'suite'=>'Profiler Shield independent 84-scenario security and API matrix',
  'source'=>'tests/catalog.json','release'=>'omegaguardian/profiler-shield ~1.0.0',
+ 'test_only_prototype'=>$prototype,
  'symfony_version'=>\Symfony\Component\HttpKernel\Kernel::VERSION,'php_version'=>PHP_VERSION,
  'modes'=>['native','generic','custom'],'debug_states'=>[false,true],
  'scenarios_declared'=>84,'variants_per_scenario'=>6,'executions_expected'=>504,'executions_observed'=>count($results),
