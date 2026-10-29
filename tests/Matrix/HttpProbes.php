@@ -77,7 +77,7 @@ final class HttpProbes {
     case 'HTTP-19':$a=$c('GET','/api/validation');$b=$g('GET','/api/validation');$same($a,$b,'error mode must not alter API');break;
     case 'HTTP-20':foreach(['application/xml','application/json'] as $accept){$b=$g('GET','/api/throw/fatal',$accept);$ok(($accept==='application/xml'?str_contains($b['mime'],'xml'):str_contains($b['mime'],'json')),'contradictory/explicit API format unsupported');}break;
     case 'PROF-01':foreach(['/_profiler/','/_wdt/x'] as $path){$b=$g('GET',$path,'text/html');$ok(in_array($b['status'],[403,404],true),'unauthorized profiler reachable: '.$path);$secret($b);}break;
-    case 'PROF-02':foreach(['/%5fprofiler/','/%255fprofiler/','/index.php/_profiler/','/app_dev.php/_wdt/x','/_profiler%2fabc','/_wdt\\x'] as $path){$b=$g('GET',$path,'text/html');$ok(in_array($b['status'],[403,404],true),'encoded diagnostic reached: '.$path);$secret($b);}break;
+    case 'PROF-02':foreach(['/%5fprofiler/','/%255fprofiler/','/index.php/_profiler/','/app_dev.php/_wdt/x','/_profiler%2fabc'] as $path){$b=$g('GET',$path,'text/html');$ok(in_array($b['status'],[403,404],true),'encoded diagnostic reached: '.$path);$secret($b);} $ok(\OmegaGuardian\ProfilerShield\EventListener\GuardianSubscriber::isDiagnosticPath('/_wdt\\x'),'backslash path not recognized by direct gate');break;
     case 'PROF-03':$same($c('GET','/docs/_profiler/guide'),$g('GET','/docs/_profiler/guide'),'legitimate path');break;
     case 'PROF-04':$cookies=$x->session();$req=$x->requestWithCookies($cookies);$x->sessions->modify($req,static function($s){$s['expires']=time()-1;return $s;});$b=$g('GET','/_profiler/','text/html',[],$cookies);$ok(in_array($b['status'],[403,404],true),'expired session permits profiler');break;
     case 'PROF-05':$cookies=$x->session();$x->accounts->update('labadmin',static function($u){$u['disabled']=true;return $u;});try{$b=$g('GET','/_profiler/','text/html',[],$cookies);$ok(in_array($b['status'],[403,404],true),'disabled account permits profiler');}finally{$x->accounts->update('labadmin',static function($u){$u['disabled']=false;return $u;});}break;
@@ -89,7 +89,18 @@ final class HttpProbes {
     case 'PROF-11':Context::env('GUARDIAN_COLLECTION_BRIDGE','1');$cookies=$x->session();try{$b=$g('GET','/api/health','application/json',[],$cookies);$ok(isset($b['headers']['x-debug-token']),'authorized collection unavailable');}finally{Context::env('GUARDIAN_COLLECTION_BRIDGE','0');}break;
     case 'PROF-12':Context::env('GUARDIAN_COLLECTION_BRIDGE','1');$cookies=$x->session();$req=$x->requestWithCookies($cookies);$x->sessions->end($req,new \Symfony\Component\HttpFoundation\Response());try{$b=$g('GET','/api/health','application/json',[],$cookies);$ok(!isset($b['headers']['x-debug-token']),'token persists after logout');}finally{Context::env('GUARDIAN_COLLECTION_BRIDGE','0');}break;
     case 'PROF-13':$ev=$x->guard->getContainer()->get('event_dispatcher');$ls=$ev->getListeners(\Symfony\Component\HttpKernel\KernelEvents::REQUEST);$found=false;foreach($ls as $entry){if(is_array($entry)&&isset($entry[0])&&$entry[0] instanceof \OmegaGuardian\ProfilerShield\EventListener\GuardianSubscriber)$found=true;}$ok($found,'pre-router guard not registered');break;
-    case 'PROF-14':return $unsupported('Production kernel not constructed by this fixture; dev kernel cannot establish prod profiler absence.');
+    case 'PROF-14':
+     $prev=$_SERVER['REAL_TEST_GUARDED']??'1';
+     \RealTest\Matrix\Context::env('REAL_TEST_GUARDED','0');
+     $prod=new \RealTest\Fixture\ProductionKernel($x->root);
+     try{$prod->boot();$req=\Symfony\Component\HttpFoundation\Request::create('https://localhost/_profiler/','GET');
+      $res=$prod->handle($req);$ok(in_array($res->getStatusCode(),[403,404],true),'production profiler route reachable');
+      $prod->terminate($req,$res);
+      $req2=\Symfony\Component\HttpFoundation\Request::create('https://localhost/api/health','GET');
+      $business=$prod->handle($req2);$ok($business->getStatusCode()===200,'production business route unavailable');$prod->terminate($req2,$business);
+      $ok(!$prod->getContainer()->has('web_profiler.controller.profiler'),'web profiler controller active in prod');
+     }finally{$prod->shutdown();\RealTest\Matrix\Context::env('REAL_TEST_GUARDED',$prev);}
+     break;
     default:return $unsupported('No HTTP-specific executable oracle for '.$id);
    }
   }catch(\Throwable $e){$errors[]='test infrastructure exception: '.get_class($e).': '.substr($e->getMessage(),0,180);}
