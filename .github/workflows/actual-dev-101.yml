@@ -63,7 +63,7 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
-          php -r 'require "baseline/vendor/autoload.php";$v=\Composer\InstalledVersions::getPrettyVersion("omegaguardian/profiler-shield");echo "Baseline installed: ".$v.PHP_EOL;if($v!=="1.0.0")exit(2);'
+          php -r 'require "baseline/vendor/autoload.php";$v=\Composer\InstalledVersions::getPrettyVersion("omegaguardian/profiler-shield");echo "Baseline installed: ".$v.PHP_EOL;if(!in_array($v,["1.0.0","v1.0.0"],true))exit(2);'
           php -r 'require "candidate/vendor/autoload.php";$v=\Composer\InstalledVersions::getPrettyVersion("omegaguardian/profiler-shield");echo "Candidate installed: ".$v.PHP_EOL;if($v!=="1.0.1-dev")exit(2);'
           src="$(sha256sum _bundle_dev/src/EventListener/PrivacySubscriber.php | cut -d' ' -f1)"
           dst="$(sha256sum candidate/vendor/omegaguardian/profiler-shield/src/EventListener/PrivacySubscriber.php | cut -d' ' -f1)"
