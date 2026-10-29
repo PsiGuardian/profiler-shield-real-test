@@ -38,22 +38,38 @@ final class StateProbes {
      $check($before===$after,'admin settings changed with invalid CSRF');
      break;
     case 'AUTH-05':
-     // End-to-end anti-replay test: OTP is valid but can only be consumed once.
-     $totp=$x->totp;$secret=$totp->generateSecret();
+     $totp=$x->totp;$secret=$totp->generateSecret();$priorTotp=$x->accounts->find('labadmin')['totp'];
      $x->accounts->update('labadmin',static function($u)use($totp,$secret){$u['totp']=$totp->encrypt($secret);$u['last_otp_counter']=-1;return $u;});
-     $counter=(int)floor(time()/30);
-     $key='';$bits='';foreach(str_split($secret) as $char)$bits.=str_pad(decbin(strpos(Totp::BASE32,$char)),5,'0',STR_PAD_LEFT);
-     foreach(str_split($bits,8) as $byte)if(strlen($byte)===8)$key.=chr(bindec($byte));
-     $h=hash_hmac('sha1',pack('N2',0,$counter),$key,true);$off=ord(substr($h,-1))&15;$code=str_pad((string)((unpack('N',substr($h,$off,4))[1]&0x7fffffff)%1000000),6,'0',STR_PAD_LEFT);
-     $accepted=$totp->verifyWindow($secret,$code);$check($accepted!==null,'fixture TOTP invalid');
-     $x->accounts->update('labadmin',static function($u)use($accepted){$u['last_otp_counter']=$accepted;return $u;});
-     // A second valid code at the same counter is not independently proof of login replay defense.
-     return $notRun('TOTP algorithm verified, but second HTTP login/MFA attempt is not yet exercised end-to-end.');
+     try{
+      $counter=(int)floor(time()/30);$key='';$bits='';
+      foreach(str_split($secret) as $char)$bits.=str_pad(decbin(strpos(Totp::BASE32,$char)),5,'0',STR_PAD_LEFT);
+      foreach(str_split($bits,8) as $byte)if(strlen($byte)===8)$key.=chr(bindec($byte));
+      $h=hash_hmac('sha1',pack('N2',0,$counter),$key,true);$off=ord(substr($h,-1))&15;
+      $otp=str_pad((string)((unpack('N',substr($h,$off,4))[1]&0x7fffffff)%1000000),6,'0',STR_PAD_LEFT);
+      $check($totp->verifyWindow($secret,$otp)!==null,'generated TOTP not recognized');
+      $form1=$x->http(true,'GET',$x->portal,'text/html');
+      preg_match('/name="_csrf" value="([^"]+)"/',$form1['body'],$m1);
+      $c1=[];foreach($form1['cookies'] as $cookie)$c1[$cookie['name']]=$cookie['value'];
+      $check(isset($m1[1]),'first MFA form CSRF missing');
+      if(!isset($m1[1]))break;
+      $first=$x->http(true,'POST',$x->portal,'text/html',[],$c1,['action'=>'login','_csrf'=>$m1[1],'username'=>'labadmin','password'=>$x->password,'otp'=>$otp]);
+      $check($first['status']===303,'first valid TOTP login rejected');
+      $form2=$x->http(true,'GET',$x->portal,'text/html');
+      preg_match('/name="_csrf" value="([^"]+)"/',$form2['body'],$m2);
+      $c2=[];foreach($form2['cookies'] as $cookie)$c2[$cookie['name']]=$cookie['value'];
+      $check(isset($m2[1]),'second MFA form CSRF missing');
+      if(!isset($m2[1]))break;
+      $second=$x->http(true,'POST',$x->portal,'text/html',[],$c2,['action'=>'login','_csrf'=>$m2[1],'username'=>'labadmin','password'=>$x->password,'otp'=>$otp]);
+      $check($second['status']!==303,'TOTP replay accepted second login');
+      $check(!in_array(Sessions::COOKIE,array_column($second['cookies'],'name'),true),'TOTP replay yielded session cookie');
+     }finally{$x->accounts->update('labadmin',static function($u)use($priorTotp){$u['totp']=$priorTotp;$u['last_otp_counter']=-1;return $u;});}
+     break;
     case 'AUTH-06':
      $cookies=$x->session();$req=$x->requestWithCookies($cookies);$before=$x->sessions->current($req);
-     $x->accounts->update('labadmin',static function($u){$u['totp']='TEST_ENROLLED';return $u;});
-     $after=$x->sessions->current($req);
-     $check($before!==null&&$after!==null,'MFA enrolment revoked current session');
+     $oldTotp=$x->accounts->find('labadmin')['totp'];
+     try{$x->accounts->update('labadmin',static function($u){$u['totp']='TEST_ENROLLED';return $u;});
+      $after=$x->sessions->current($req);$check($before!==null&&$after!==null,'MFA enrolment revoked current session');
+     }finally{$x->accounts->update('labadmin',static function($u)use($oldTotp){$u['totp']=$oldTotp;return $u;});}
      break;
     case 'AUTH-07':
      $cookies1=$x->session();$cookies2=$x->session();$check($x->sessions->current($x->requestWithCookies($cookies1))!==null,'first fixture session invalid');
