@@ -1,0 +1,50 @@
+name: Seeded HTTP mutation and differential fuzzing
+on:
+  push:
+    branches: [feature/matrix-84-deep-validation]
+  pull_request:
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  fuzz:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - { php: '8.3', symfony: '5.4' }
+          - { php: '8.3', symfony: '6.4' }
+          - { php: '8.3', symfony: '7.4' }
+          - { php: '8.4', symfony: '7.4' }
+          - { php: '8.4', symfony: '8.1' }
+    steps:
+      - uses: actions/checkout@v4
+      - uses: shivammathur/setup-php@v2
+        with:
+          php-version: ${{ matrix.php }}
+          tools: composer:v2
+          extensions: openssl, mbstring, xml, curl, zip
+          coverage: none
+      - name: Pin framework version on disposable runner
+        env:
+          SYMFONY_BRANCH: ${{ matrix.symfony }}
+        run: |
+          php -r '$p=json_decode(file_get_contents("composer.json"),true);foreach($p["require"] as $k=>$v)if(str_starts_with($k,"symfony/"))$p["require"][$k]=getenv("SYMFONY_BRANCH").".*";file_put_contents("composer.json",json_encode($p,JSON_PRETTY_PRINT).PHP_EOL);'
+      - run: composer update --no-plugins --no-scripts --no-interaction --prefer-dist --no-progress
+      - run: php -l bin/fuzz.php
+      - name: Fuzz 900 deterministic variants against clean and guarded kernels
+        run: |
+          mkdir -p reports
+          php bin/fuzz.php > reports/fuzz.json
+      - name: Upload bounded differential fuzz report
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: fuzz-php${{ matrix.php }}-symfony${{ matrix.symfony }}
+          path: reports/fuzz.json
+          if-no-files-found: warn
+          retention-days: 14
+      - name: Gate any leaked diagnostic or status regression
+        run: php bin/fuzz_gate.php reports/fuzz.json

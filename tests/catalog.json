@@ -1,0 +1,763 @@
+{
+  "schema": 1,
+  "source": "docs/matrice-de-tests.md",
+  "total": 84,
+  "scenarios": [
+    {
+      "id": "BASE-01",
+      "name": "Installation de référence",
+      "preconditions": "Symfony clean et Guardian sur mêmes dépendances et fixtures",
+      "action": "Exécuter une requête GET /api/health sur A et B",
+      "expected": "200, corps, headers et effets identiques hors retrait X-Debug-*",
+      "failure": "statut, données ou effet métier différents",
+      "priority": "P0"
+    },
+    {
+      "id": "BASE-02",
+      "name": "Réponse JSON métier 422",
+      "preconditions": "Route de validation retourne JsonResponse structuré sans exception",
+      "action": "GET /api/validation-response",
+      "expected": "422, schéma code/fields/message identique et JSON valide",
+      "failure": "JSON modifié, champ absent ou statut changé",
+      "priority": "P0"
+    },
+    {
+      "id": "BASE-03",
+      "name": "Réponse XML métier 422",
+      "preconditions": "Route XML déjà construite",
+      "action": "GET Accept application/xml",
+      "expected": "422, XML strictement équivalent et Content-Type adéquat",
+      "failure": "HTML/JSON substitué ou XML invalide",
+      "priority": "P0"
+    },
+    {
+      "id": "BASE-04",
+      "name": "Erreur métier levée 422",
+      "preconditions": "Exception métier + listener API custom sur A ; mapper public prévu sur B",
+      "action": "Déclencher la validation par exception",
+      "expected": "code métier et champs allowlist restitués, sans trace",
+      "failure": "code métier écrasé ou message privé exposé",
+      "priority": "P0"
+    },
+    {
+      "id": "BASE-05",
+      "name": "API consommateur",
+      "preconditions": "Client test attend code métier API_DOMAIN_ERROR",
+      "action": "Exécuter client sur A puis B",
+      "expected": "Le client réalise les mêmes transitions métier",
+      "failure": "client échoue uniquement avec Guardian",
+      "priority": "P0"
+    },
+    {
+      "id": "BASE-06",
+      "name": "Réponse 429 construite",
+      "preconditions": "Contrôleur renvoie Retry-After=37 et JSON",
+      "action": "GET /api/rate-response",
+      "expected": "429, Retry-After et code métier inchangés",
+      "failure": "en-tête perdu ou corps altéré",
+      "priority": "P0"
+    },
+    {
+      "id": "BASE-07",
+      "name": "Méthode POST interdite",
+      "preconditions": "Route GET seule",
+      "action": "POST /api/health",
+      "expected": "405, Allow correct, aucun changement métier",
+      "failure": "mauvais statut ou Allow perdu",
+      "priority": "P0"
+    },
+    {
+      "id": "BASE-08",
+      "name": "Erreurs HTTP créées par router",
+      "preconditions": "Routes inconnues, méthodes refusées",
+      "action": "GET /unknown et OPTIONS route GET",
+      "expected": "404/405, fallback sûr, absence de marqueurs internes",
+      "failure": "statut changé, sentinelle ou trace publique",
+      "priority": "P0"
+    },
+    {
+      "id": "SAFE-01",
+      "name": "RuntimeException interne",
+      "preconditions": "Throwable contient SENTINEL_PRIVATE_RUNTIME",
+      "action": "Déclencher GET /api/throw/fatal non connecté",
+      "expected": "500, corps neutre, aucune sentinelle sur contenu et headers",
+      "failure": "texte interne accessible",
+      "priority": "P0"
+    },
+    {
+      "id": "SAFE-02",
+      "name": "Erreur SQL simulée",
+      "preconditions": "Exception texte contient DSN/SQL fictif",
+      "action": "Déclencher exception 500",
+      "expected": "500, aucun DSN, nom de table, mot de passe ou chemin",
+      "failure": "fuite d'une sentinelle",
+      "priority": "P0"
+    },
+    {
+      "id": "SAFE-03",
+      "name": "Exception inconnue 4xx",
+      "preconditions": "HttpException 422 avec secret dans message",
+      "action": "GET /api/throw/untrusted-validation",
+      "expected": "422, contenu neutre, message interne absent",
+      "failure": "message de l'exception publié",
+      "priority": "P0"
+    },
+    {
+      "id": "SAFE-04",
+      "name": "Erreur publique validée",
+      "preconditions": "Mapper allowlist code PRODUCT_OUT_OF_STOCK",
+      "action": "GET /api/stock/missing",
+      "expected": "409, code public déclaré, pas de champ privé",
+      "failure": "code manquant ou champ privé transmis",
+      "priority": "P0"
+    },
+    {
+      "id": "SAFE-05",
+      "name": "Mapper malveillant ou invalide",
+      "preconditions": "Mapper renvoie un header interdit ou donnée non conforme",
+      "action": "Déclencher mapper dans fixture hostile",
+      "expected": "Fallback neutre, aucun secret ni header interdit",
+      "failure": "header privé ou corps brute transmis",
+      "priority": "P0"
+    },
+    {
+      "id": "SAFE-06",
+      "name": "Mapper qui lève Throwable",
+      "preconditions": "Mapper lance RuntimeException interne",
+      "action": "Exécuter route associée",
+      "expected": "Fallback sûr, statut attendu, absence d'exception secondaire publique",
+      "failure": "double-fault, message divulgué, 500 injustifié",
+      "priority": "P0"
+    },
+    {
+      "id": "SAFE-07",
+      "name": "Exception imbriquée",
+      "preconditions": "Throwable::getPrevious et trace ont sentinelles",
+      "action": "Déclencher erreur publique",
+      "expected": "Aucune sentinelle dans HTML/JSON/XML/headers",
+      "failure": "chaîne de cause visible",
+      "priority": "P0"
+    },
+    {
+      "id": "SAFE-08",
+      "name": "Réponse construite avec X-Debug",
+      "preconditions": "Un contrôleur retourne JSON métier + X-Debug-Token",
+      "action": "Appel anonyme",
+      "expected": "Corps inchangé, header technique expurgé",
+      "failure": "header conservé ou JSON altéré",
+      "priority": "P0"
+    },
+    {
+      "id": "SAFE-09",
+      "name": "Utilisateur autorisé",
+      "preconditions": "Compte/sessions/policy Guardian pleinement valides",
+      "action": "Demander page d'exception en dev",
+      "expected": "Diagnostic disponible selon configuration",
+      "failure": "droit inutilement refusé ou accès public ouvert",
+      "priority": "P0"
+    },
+    {
+      "id": "SAFE-10",
+      "name": "Panne du coffre pendant exception",
+      "preconditions": "Répertoire vault non lisible",
+      "action": "Appeler une route qui lève une exception",
+      "expected": "Diagnostics refusés, fallback sûr, pas d'exception secondaire publique",
+      "failure": "fuite ou 2xx erroné",
+      "priority": "P0"
+    },
+    {
+      "id": "SAFE-11",
+      "name": "Mode HTML native",
+      "preconditions": "Page 404 host sûre avec contrat HTML",
+      "action": "GET /missing Accept text/html",
+      "expected": "Page publique host conservée lorsque contrôlée et sûre, statut 404",
+      "failure": "page métier sûre modifiée inutilement",
+      "priority": "P0"
+    },
+    {
+      "id": "SAFE-12",
+      "name": "Modes generic/custom",
+      "preconditions": "Configurer mode + texte personnalisé non dangereux",
+      "action": "GET /missing Accept text/html",
+      "expected": "HTML neutre/personnalisé échappé, statut réel",
+      "failure": "XSS ou modification du statut",
+      "priority": "P0"
+    },
+    {
+      "id": "SAFE-13",
+      "name": "Texte public contenant HTML",
+      "preconditions": "error_custom_text contient <script> fictif",
+      "action": "Déclencher exception HTML",
+      "expected": "Script échappé, CSP cohérente",
+      "failure": "exécution d'injection",
+      "priority": "P0"
+    },
+    {
+      "id": "SAFE-14",
+      "name": "Policy MFA et préexistence",
+      "preconditions": "Compte MFA activé avec session courante",
+      "action": "Inscrire TOTP, continuer session",
+      "expected": "Session courante valide, MFA future effective selon politique",
+      "failure": "déconnexion courante non voulue ou accès bypass",
+      "priority": "P0"
+    },
+    {
+      "id": "HTTP-01",
+      "name": "Codes exacts",
+      "preconditions": "Exceptions 400 401 403 404 405 409 422 429 500 503",
+      "action": "Déclencher chaque statut",
+      "expected": "Statut inchangé, aucun 200 masquant erreur",
+      "failure": "au moins un statut changé",
+      "priority": "P0"
+    },
+    {
+      "id": "HTTP-02",
+      "name": "WWW-Authenticate",
+      "preconditions": "HttpException 401 avec Bearer realm de test",
+      "action": "GET route protégée",
+      "expected": "401 + WWW-Authenticate validé",
+      "failure": "header absent ou statut erroné",
+      "priority": "P0"
+    },
+    {
+      "id": "HTTP-03",
+      "name": "Retry-After",
+      "preconditions": "HttpException 429 avec Retry-After=37",
+      "action": "Déclencher throttle",
+      "expected": "429 et 37 conservés",
+      "failure": "header perdu",
+      "priority": "P0"
+    },
+    {
+      "id": "HTTP-04",
+      "name": "Allow",
+      "preconditions": "HttpException 405 avec Allow=GET, HEAD",
+      "action": "POST route GET",
+      "expected": "405 et header validé",
+      "failure": "Allow supprimé",
+      "priority": "P0"
+    },
+    {
+      "id": "HTTP-05",
+      "name": "HEAD",
+      "preconditions": "Route HEAD et GET, exception 404",
+      "action": "HEAD /api/missing",
+      "expected": "Statut correct, corps HTTP transmis vide, headers conformes",
+      "failure": "corps transmis ou statut altéré",
+      "priority": "P0"
+    },
+    {
+      "id": "HTTP-06",
+      "name": "204/304 sans corps",
+      "preconditions": "Fixtures explicitement retournent 204, 304",
+      "action": "GET fixtures",
+      "expected": "Aucun corps et headers cohérents",
+      "failure": "corps inséré",
+      "priority": "P0"
+    },
+    {
+      "id": "HTTP-07",
+      "name": "OPTIONS CORS preflight",
+      "preconditions": "API hôte a preflight OPTIONS + autorisation origine fictive",
+      "action": "OPTIONS Origin + ACR-Method",
+      "expected": "statut, CORS et Vary de l'hôte conservés",
+      "failure": "preflight modifié ou headers perdus",
+      "priority": "P0"
+    },
+    {
+      "id": "HTTP-08",
+      "name": "CORS d'une erreur publique",
+      "preconditions": "Mapper explicitement approuve Access-Control-Allow-Origin",
+      "action": "GET route publique qui lève 422",
+      "expected": "Header CORS explicitement déclaré conservé",
+      "failure": "header supprimé ou origine non approuvée injectée",
+      "priority": "P0"
+    },
+    {
+      "id": "HTTP-09",
+      "name": "JSON Accept simple",
+      "preconditions": "Client envoie application/json",
+      "action": "Déclencher exception inconnue",
+      "expected": "JSON syntaxiquement valide et Content-Type JSON",
+      "failure": "HTML transmis",
+      "priority": "P0"
+    },
+    {
+      "id": "HTTP-10",
+      "name": "XML Accept",
+      "preconditions": "Client envoie application/xml",
+      "action": "Déclencher exception inconnue",
+      "expected": "XML bien formé, statut préservé, MIME XML",
+      "failure": "HTML, JSON ou XML invalide",
+      "priority": "P0"
+    },
+    {
+      "id": "HTTP-11",
+      "name": "Problem JSON",
+      "preconditions": "Accept application/problem+json",
+      "action": "Déclencher exception inconnue",
+      "expected": "RFC 9457, status correct, title sûr",
+      "failure": "trace, mauvais MIME ou status interne différent",
+      "priority": "P0"
+    },
+    {
+      "id": "HTTP-12",
+      "name": "Problem XML",
+      "preconditions": "Accept application/problem+xml",
+      "action": "Déclencher exception inconnue",
+      "expected": "Problem XML conforme sans entité externe",
+      "failure": "mauvais MIME ou fuite",
+      "priority": "P0"
+    },
+    {
+      "id": "HTTP-13",
+      "name": "Accept qualité q",
+      "preconditions": "Accept text/html;q=0.1,application/json;q=0.9",
+      "action": "Déclencher 500",
+      "expected": "JSON choisi si aucune contrainte route contraire",
+      "failure": "HTML choisi à tort",
+      "priority": "P0"
+    },
+    {
+      "id": "HTTP-14",
+      "name": "Accept wildcards",
+      "preconditions": "Accept */* et application/*+json",
+      "action": "Déclencher erreurs connues/inconnues",
+      "expected": "Fallback déterministe et format validé",
+      "failure": "choix instable ou réponse non parsable",
+      "priority": "P0"
+    },
+    {
+      "id": "HTTP-15",
+      "name": "Longueur ETag compression",
+      "preconditions": "Réponse HTML modifiée et headers initiaux longueur/etag/encoding",
+      "action": "Activer generic/custom",
+      "expected": "Aucun header périmé après changement de contenu",
+      "failure": "ETag ou longueur invalides",
+      "priority": "P0"
+    },
+    {
+      "id": "HTTP-16",
+      "name": "Redirections et cookies",
+      "preconditions": "Route 303 avec Location et Set-Cookie de test",
+      "action": "POST /api/session/redirect",
+      "expected": "303, Location, cookie intacts hors politique existante",
+      "failure": "mutation non prévue",
+      "priority": "P0"
+    },
+    {
+      "id": "HTTP-17",
+      "name": "Streaming",
+      "preconditions": "StreamedResponse et téléchargement binaire",
+      "action": "Lire flux depuis A/B",
+      "expected": "octets et headers identiques hors métadonnées techniques",
+      "failure": "flux corrompu ou bloqué",
+      "priority": "P0"
+    },
+    {
+      "id": "HTTP-18",
+      "name": "SSE",
+      "preconditions": "Route text/event-stream simulée",
+      "action": "Consommer 10 événements",
+      "expected": "événements et durée de streaming cohérents",
+      "failure": "buffering/réécriture introduits",
+      "priority": "P0"
+    },
+    {
+      "id": "HTTP-19",
+      "name": "Mode custom sur API",
+      "preconditions": "error_mode=custom, API JSON 422",
+      "action": "GET /api/validation-response",
+      "expected": "JSON métier intact, aucune page HTML",
+      "failure": "API remplacée par page custom",
+      "priority": "P0"
+    },
+    {
+      "id": "HTTP-20",
+      "name": "Content-Type explicite de route",
+      "preconditions": "RequestFormat JSON/XML + Accept contradictoire",
+      "action": "Tester les préférences documentées",
+      "expected": "Format conforme à la politique de négociation publiée",
+      "failure": "substitution arbitraire",
+      "priority": "P0"
+    },
+    {
+      "id": "PROF-01",
+      "name": "Chemins standards",
+      "preconditions": "Visiteur anonyme",
+      "action": "GET /_profiler et /_wdt",
+      "expected": "403/404 sans token ni détails",
+      "failure": "profil accessible",
+      "priority": "P0"
+    },
+    {
+      "id": "PROF-02",
+      "name": "Double encoding",
+      "preconditions": "Variantes %5fprofiler, %255fprofiler, séparateurs et index.php",
+      "action": "Rejouer corpus borné",
+      "expected": "Aucun 200 de diagnostic non autorisé",
+      "failure": "contournement",
+      "priority": "P0"
+    },
+    {
+      "id": "PROF-03",
+      "name": "Sous-chemin légitime",
+      "preconditions": "Route métier /docs/_profiler/guide",
+      "action": "GET route métier",
+      "expected": "route non bloquée par simple substring",
+      "failure": "faux positif",
+      "priority": "P0"
+    },
+    {
+      "id": "PROF-04",
+      "name": "Session Guardian expirée",
+      "preconditions": "Cookie valide mais session expirée",
+      "action": "GET /_profiler",
+      "expected": "Refus strict",
+      "failure": "accès autorisé",
+      "priority": "P0"
+    },
+    {
+      "id": "PROF-05",
+      "name": "Compte désactivé",
+      "preconditions": "Session existante, compte désactivé",
+      "action": "GET /_profiler",
+      "expected": "Refus immédiat",
+      "failure": "profiler visible",
+      "priority": "P0"
+    },
+    {
+      "id": "PROF-06",
+      "name": "IP non autorisée",
+      "preconditions": "Client hors allowlist",
+      "action": "GET /_profiler",
+      "expected": "Refus",
+      "failure": "accès accordé",
+      "priority": "P0"
+    },
+    {
+      "id": "PROF-07",
+      "name": "TimeLock et JIT",
+      "preconditions": "Horaire fermé/JIT absent",
+      "action": "GET /_profiler",
+      "expected": "Refus",
+      "failure": "accès accordé",
+      "priority": "P0"
+    },
+    {
+      "id": "PROF-08",
+      "name": "Lockdown",
+      "preconditions": "Verrouillage actif",
+      "action": "GET /_profiler puis /api/health",
+      "expected": "profiler refusé, API 200",
+      "failure": "API métier interrompue",
+      "priority": "P0"
+    },
+    {
+      "id": "PROF-09",
+      "name": "Pont désactivé",
+      "preconditions": "GUARDIAN_COLLECTION_BRIDGE=0",
+      "action": "Requête anonyme de fixture",
+      "expected": "Aucun profil collecté si framework collect=false",
+      "failure": "collecte",
+      "priority": "P0"
+    },
+    {
+      "id": "PROF-10",
+      "name": "Pont activé anonyme",
+      "preconditions": "Bridge=1, cookie absent",
+      "action": "Requête métier puis toolbar",
+      "expected": "Aucun token, profil ni toolbar",
+      "failure": "collecte publique",
+      "priority": "P0"
+    },
+    {
+      "id": "PROF-11",
+      "name": "Pont activé autorisé",
+      "preconditions": "Bridge=1, policy validée",
+      "action": "Requête métier et accès profil",
+      "expected": "Collecte possible uniquement autorisé",
+      "failure": "collecte impossible ou ouverte à tous",
+      "priority": "P0"
+    },
+    {
+      "id": "PROF-12",
+      "name": "Logout/expiration",
+      "preconditions": "Collecte autorisée puis logout",
+      "action": "Requête anonyme successive",
+      "expected": "Collecte coupée et tokens effacés",
+      "failure": "collecte persistante",
+      "priority": "P0"
+    },
+    {
+      "id": "PROF-13",
+      "name": "Ordre listeners",
+      "preconditions": "Toutes versions supportées",
+      "action": "debug:event-dispatcher + test HTTP",
+      "expected": "Ordre et confidentialité mesurés et cohérents",
+      "failure": "ordre inconnu mais pont activé",
+      "priority": "P0"
+    },
+    {
+      "id": "PROF-14",
+      "name": "Production",
+      "preconditions": "APP_ENV=prod, APP_DEBUG=0",
+      "action": "Boot et demande routes diagnostic",
+      "expected": "Profiler/collecte absents, aucune exposition",
+      "failure": "profiler actif",
+      "priority": "P0"
+    },
+    {
+      "id": "AUTH-01",
+      "name": "Connexion valide",
+      "preconditions": "Compte de test local Guardian",
+      "action": "Login puis route autorisée",
+      "expected": "Session créée et accès selon policy",
+      "failure": "session refusée sans motif",
+      "priority": "P1"
+    },
+    {
+      "id": "AUTH-02",
+      "name": "Échec login",
+      "preconditions": "Identifiants invalides",
+      "action": "Répéter dans limites puis au seuil",
+      "expected": "throttle appliqué, aucun énumération de comptes",
+      "failure": "contournement du seuil",
+      "priority": "P1"
+    },
+    {
+      "id": "AUTH-03",
+      "name": "CSRF login",
+      "preconditions": "Cookie/token absent ou faux",
+      "action": "POST login",
+      "expected": "Refus sans session",
+      "failure": "session créée",
+      "priority": "P1"
+    },
+    {
+      "id": "AUTH-04",
+      "name": "CSRF admin",
+      "preconditions": "Session admin, token faux",
+      "action": "POST action réglage",
+      "expected": "Aucune modification de settings",
+      "failure": "mutation effective",
+      "priority": "P1"
+    },
+    {
+      "id": "AUTH-05",
+      "name": "TOTP anti-replay",
+      "preconditions": "OTP valide utilisé une fois",
+      "action": "Réutiliser même OTP",
+      "expected": "Réutilisation rejetée",
+      "failure": "OTP accepté deux fois",
+      "priority": "P1"
+    },
+    {
+      "id": "AUTH-06",
+      "name": "Session MFA en cours",
+      "preconditions": "Session existante, inscription MFA réussie",
+      "action": "Enrôler et continuer la navigation",
+      "expected": "Session actuelle conservée",
+      "failure": "logout imposé",
+      "priority": "P1"
+    },
+    {
+      "id": "AUTH-07",
+      "name": "Révocation autres sessions",
+      "preconditions": "Deux sessions, action opt-in",
+      "action": "Révoquer les autres avec reauth",
+      "expected": "autre session refusée, actuelle valide",
+      "failure": "déconnexion de la courante ou session distante valide",
+      "priority": "P1"
+    },
+    {
+      "id": "AUTH-08",
+      "name": "Changement mot de passe",
+      "preconditions": "Deux sessions actives",
+      "action": "Modifier mot de passe",
+      "expected": "sessions anciennes révoquées selon politique publiée",
+      "failure": "ancien cookie garde droits indus",
+      "priority": "P1"
+    },
+    {
+      "id": "AUTH-09",
+      "name": "Cookie protection",
+      "preconditions": "HTTPS et réponse login",
+      "action": "Vérifier Secure,HttpOnly,SameSite,__Host-",
+      "expected": "attributs robustes",
+      "failure": "cookie insuffisamment protégé",
+      "priority": "P1"
+    },
+    {
+      "id": "AUTH-10",
+      "name": "Appareil mémorisé",
+      "preconditions": "Cookie trusted-device",
+      "action": "Tester reconnexion après expiration session",
+      "expected": "ne suffit jamais seul à être authentifié",
+      "failure": "bypass du login",
+      "priority": "P1"
+    },
+    {
+      "id": "FAULT-01",
+      "name": "Vault inaccessible",
+      "preconditions": "Rendre vault illisible en fixture",
+      "action": "GET /api/health, puis /_profiler",
+      "expected": "200 API, profiler refusé",
+      "failure": "API 500 ou profiler ouvert",
+      "priority": "P1"
+    },
+    {
+      "id": "FAULT-02",
+      "name": "Clé de chiffrement invalide",
+      "preconditions": "Modifier la clé de test",
+      "action": "Demander diagnostic puis requête métier",
+      "expected": "diagnostic fermé, métier non dépendant intact",
+      "failure": "secret déchiffré ou API cassée",
+      "priority": "P1"
+    },
+    {
+      "id": "FAULT-03",
+      "name": "Fichier corrompu",
+      "preconditions": "Écrire faux JSON/valeurs hors schéma",
+      "action": "Relire settings et session",
+      "expected": "refus sûr, aucune exception publique sensible",
+      "failure": "fuite ou fail-open",
+      "priority": "P1"
+    },
+    {
+      "id": "FAULT-04",
+      "name": "Rendu d'erreur défaillant",
+      "preconditions": "Simuler erreur dans renderer",
+      "action": "Déclencher 500",
+      "expected": "fallback neutre sans boucle",
+      "failure": "récursion/double exception",
+      "priority": "P1"
+    },
+    {
+      "id": "FAULT-05",
+      "name": "Écriture audit indisponible",
+      "preconditions": "Forcer défaut I/O audit",
+      "action": "Requête métier + intervention",
+      "expected": "comportement conforme invariant sécurité, pas d'injection",
+      "failure": "erreur de site non justifiée",
+      "priority": "P1"
+    },
+    {
+      "id": "FAULT-06",
+      "name": "Charge modérée",
+      "preconditions": "1000 requêtes locales contrôlées",
+      "action": "Comparer p50,p95,p99 et RAM A/B",
+      "expected": "pas de fuite ni dégradation non expliquée",
+      "failure": "latence excessive persistante, mémoire non bornée",
+      "priority": "P1"
+    },
+    {
+      "id": "FAULT-07",
+      "name": "Concurrence",
+      "preconditions": "Sessions, login et changements simultanés",
+      "action": "Exécuter parallèlement",
+      "expected": "cohérence stockage, pas de replay",
+      "failure": "race condition exploitable",
+      "priority": "P1"
+    },
+    {
+      "id": "FAULT-08",
+      "name": "Installation sans scripts",
+      "preconditions": "Composer install --no-plugins --no-scripts",
+      "action": "Installer clean puis bundle",
+      "expected": "aucun effet secondaire implicite",
+      "failure": "modifications à l'installation",
+      "priority": "P1"
+    },
+    {
+      "id": "FAULT-09",
+      "name": "Uninstall réversible",
+      "preconditions": "Installation et données factices",
+      "action": "Désinstaller sans purge",
+      "expected": "fichiers hôte modifiés conservés, contrôle explicite",
+      "failure": "perte de données",
+      "priority": "P1"
+    },
+    {
+      "id": "FAULT-10",
+      "name": "Production et dépendances",
+      "preconditions": "Variantes php et symfony de matrice",
+      "action": "composer validate, audit, test",
+      "expected": "résolution et tests OK",
+      "failure": "version non compatible annoncée",
+      "priority": "P1"
+    },
+    {
+      "id": "DOCTOR-01",
+      "name": "Doctor HTTP nominal",
+      "preconditions": "Fixture valide",
+      "action": "guardian:doctor --http",
+      "expected": "codes stables PASS/WARN/FAIL/SKIP",
+      "failure": "résultat inexploitable",
+      "priority": "P1"
+    },
+    {
+      "id": "DOCTOR-02",
+      "name": "Doctor JSON",
+      "preconditions": "Même fixture",
+      "action": "guardian:doctor --http --json",
+      "expected": "JSON parsable, schéma stable, aucun secret",
+      "failure": "champ secret ou JSON invalide",
+      "priority": "P1"
+    },
+    {
+      "id": "DOCTOR-03",
+      "name": "Doctor erreur",
+      "preconditions": "Profiler dangereux en prod",
+      "action": "doctor --http --strict",
+      "expected": "exit non nul et diagnostic explicite",
+      "failure": "exit 0 alors qu'invariant P0 violé",
+      "priority": "P1"
+    },
+    {
+      "id": "DOCTOR-04",
+      "name": "Doctor sans réseau",
+      "preconditions": "Sortie réseau bloquée",
+      "action": "doctor --http",
+      "expected": "réussite sans requête externe",
+      "failure": "connexion tentée",
+      "priority": "P1"
+    },
+    {
+      "id": "DOCTOR-05",
+      "name": "Audit intervention",
+      "preconditions": "Exception neutralisée puis réponse saine",
+      "action": "Inspecter logs après chaque",
+      "expected": "un événement normalisé utile seulement pour intervention",
+      "failure": "corps/cookie/token/secret journalisé",
+      "priority": "P1"
+    },
+    {
+      "id": "DOCTOR-06",
+      "name": "Audit rétention",
+      "preconditions": "Evénements > quota et âge maxi",
+      "action": "Purger",
+      "expected": "limites de conservation respectées",
+      "failure": "croissance non bornée",
+      "priority": "P1"
+    },
+    {
+      "id": "DOCTOR-07",
+      "name": "Docs 28 locales",
+      "preconditions": "Générateur et catalogues existants",
+      "action": "audit de traduction et docs",
+      "expected": "liens complets, chaînes présentes, modifications manuelles préservées",
+      "failure": "fichiers supprimés recréés ou liens brisés",
+      "priority": "P1"
+    },
+    {
+      "id": "DOCTOR-08",
+      "name": "Diff release",
+      "preconditions": "Comparer bundle avant/après mise à jour",
+      "action": "Tester settings, coffre, commandes, cookies",
+      "expected": "migration et rollback documentés, aucun écrasement",
+      "failure": "migration destructive",
+      "priority": "P1"
+    }
+  ]
+}
