@@ -30,6 +30,8 @@ function runSetup(string $root):array {
  setTestEnv('GUARDIAN_STORAGE_DIR','');setTestEnv('GUARDIAN_ENCRYPTION_KEY','');setTestEnv('GUARDIAN_LOGIN_PATH','');setTestEnv('APP_ENV','dev');
  $vault=new FileStore($root.'/.guardian-shield');
  $command=new SetupCommand($root,$vault,new Accounts($vault));
+ $application=new \Symfony\Component\Console\Application('isolated-setup-fixture');
+ $application->add($command); // supplies Symfony's QuestionHelper without any external processes
  $input=new ArrayInput(['--automatic'=>true,'--no-admin'=>true,'--path'=>'/internal/testonly-'.str_repeat('a',32)],$command->getDefinition());
  $input->setInteractive(false);$output=new BufferedOutput();
  $exit=$command->run($input,$output);
