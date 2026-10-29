@@ -1,0 +1,56 @@
+name: Guardian lifecycle and authentication fault injection
+on:
+  push:
+    branches: [feature/fault-auth-lifecycle-v4]
+  pull_request:
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  phase4:
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - { php: '8.3', symfony: '5.4' }
+          - { php: '8.3', symfony: '6.4' }
+          - { php: '8.3', symfony: '7.4' }
+          - { php: '8.4', symfony: '7.4' }
+          - { php: '8.4', symfony: '8.1' }
+    steps:
+      - uses: actions/checkout@v4
+      - uses: shivammathur/setup-php@v2
+        with:
+          php-version: ${{ matrix.php }}
+          tools: composer:v2
+          extensions: openssl, mbstring, xml, curl, zip, tokenizer
+          coverage: none
+      - name: Select exact supported Symfony branch on disposable runner
+        env:
+          SYMFONY_BRANCH: ${{ matrix.symfony }}
+        run: |
+          php -r '$p=json_decode(file_get_contents("composer.json"),true);foreach($p["require"] as $k=>$v)if(str_starts_with($k,"symfony/"))$p["require"][$k]=getenv("SYMFONY_BRANCH").".*";file_put_contents("composer.json",json_encode($p,JSON_PRETTY_PRINT).PHP_EOL);'
+      - name: Install unmodified release
+        run: composer update --no-plugins --no-scripts --no-interaction --prefer-dist --no-progress
+      - name: Validate syntax
+        run: php -l bin/lifecycle.php && php -l bin/auth_e2e.php
+      - name: Actual setup, uninstall, purge and host-data preservation
+        run: |
+          mkdir -p reports
+          php bin/lifecycle.php > reports/lifecycle.json
+      - name: End-to-end authentication and failure behavior
+        run: php bin/auth_e2e.php > reports/auth_e2e.json
+      - name: Preserve reports even if a test fails
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: phase4-php${{ matrix.php }}-symfony${{ matrix.symfony }}
+          path: reports/
+          if-no-files-found: warn
+          retention-days: 14
+      - name: Strict report gate
+        if: always()
+        run: |
+          php -r 'foreach(["lifecycle"=>6,"auth_e2e"=>10] as $file=>$expected){$p="reports/$file.json";$x=json_decode((string)@file_get_contents($p),true);if(!is_array($x)){echo "Invalid or missing $p".PHP_EOL;exit(2);}echo "$file ".($x["passed"]??"?")."/".($x["scenarios"]??"?")." passed".PHP_EOL;foreach(($x["tests"]??$x["results"]??[]) as $t)if($t["status"]!=="PASS")echo $t["id"]." : ".implode("; ",$t["reasons"]).PHP_EOL;if(($x["scenarios"]??0)!==$expected||($x["passed"]??0)!==$expected)exit(1);}'
