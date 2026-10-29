@@ -31,7 +31,10 @@ foreach(['native','generic','custom'] as $mode){
      $clean=$ctx->http(false,$method,$path,$accept,$headers,$cookies);
      $guard=$ctx->http(true,$method,$path,$accept,$headers,$cookies);
      $bad=[];
-     if($guard['status']!==$clean['status'])$bad[]='status differs: '.$clean['status'].' vs '.$guard['status'];
+     $diagnostic=GuardianSubscriber::isDiagnosticPath(rawurldecode(rawurldecode($path)));
+     // The unprotected reference kernel has no profiler. It is not a valid status oracle for a protected diagnostic route.
+     // For diagnostics the security oracle is explicit denial and no leaked content; business routes retain strict parity.
+     if(!$diagnostic&&$guard['status']!==$clean['status'])$bad[]='business status differs: '.$clean['status'].' vs '.$guard['status'];
      $public=$guard['body'].' '.json_encode($guard['headers']);
      foreach($secrets as $sentinel)if(str_contains($public,$sentinel))$bad[]='confidential sentinel leaked';
      $decodedPath=rawurldecode(rawurldecode($path));
