@@ -12,6 +12,7 @@ Dépôt public et indépendant consacré à la **spécification, aux tests diff�
 - [Audit approfondi : 84 scénarios, 2520 évaluations, transport réel et fuzzing](docs/rapport-84-approfondi.md)
 - [Phase 3 — Résultats du prototype Safe Native et de la concurrence](docs/rapport-phase3.md)
 - [Phase 4 — 115 vérifications d'installation, authentification et injection de pannes](docs/rapport-phase4.md)
+- [Validation de la vraie branche dev-1.0.1 — 84 scénarios, transport HTTP et fuzzing](docs/rapport-validation-reelle-dev-1.0.1.md)
 - [Plan d'intégration sécurisée (sans modifier le bundle original)](docs/plan-integration-safe-native.md)
 
 ## Méthode
