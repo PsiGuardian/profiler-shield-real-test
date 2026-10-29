@@ -1,6 +1,7 @@
 <?php
 declare(strict_types=1);
 require dirname(__DIR__).'/vendor/autoload.php';
+ob_start(); // Keep Symfony debug output away from machine-readable report.
 use RealTest\Matrix\Context;
 use OmegaGuardian\ProfilerShield\EventListener\GuardianSubscriber;
 const SEED=20261029;
@@ -62,5 +63,7 @@ foreach(['native','generic','custom'] as $mode){
 $report=['schema'=>1,'suite'=>'Seeded bounded HTTP differential fuzzing','seed'=>SEED,
  'php_version'=>PHP_VERSION,'symfony_version'=>\Symfony\Component\HttpKernel\Kernel::VERSION,
  'per_mode_debug'=>150,'total'=>array_sum($totals),'counts'=>$totals,'runs'=>$results];
+$captured=ob_get_clean();
+if($captured!=='')fwrite(STDERR,'Suppressed fixture stdout bytes: '.strlen($captured).PHP_EOL);
 echo json_encode($report,JSON_PRETTY_PRINT|JSON_UNESCAPED_SLASHES|JSON_INVALID_UTF8_SUBSTITUTE),PHP_EOL;
 if(in_array('--strict',$argv,true)&&($totals['FAIL']>0||$totals['NOT_RUN']>0))exit(1);
