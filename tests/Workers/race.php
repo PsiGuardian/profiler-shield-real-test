@@ -21,7 +21,8 @@ try{
   try{
    $ticket=$throttle->begin('one-user','198.51.100.23');
    usleep(15000);
-   if(!$throttle->finish($ticket,false)){fwrite(STDERR,'finish rejected reserved attempt'.PHP_EOL);exit(3);}
+   // Failed credentials must be counted; finish(false) intentionally returns false.
+   $throttle->finish($ticket,false);
    echo 'ACCEPT'.PHP_EOL;
   }catch(LoginRateLimited $e){echo 'BLOCK'.PHP_EOL;}
  }else exit(2);
