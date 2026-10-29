@@ -1,0 +1,47 @@
+name: Real Symfony differential gate
+on:
+  push:
+    branches: [feature/real-test-lab-v1, main]
+  pull_request:
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  differential:
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - { php: '8.3', symfony: '5.4' }
+          - { php: '8.3', symfony: '6.4' }
+          - { php: '8.3', symfony: '7.4' }
+          - { php: '8.4', symfony: '7.4' }
+          - { php: '8.4', symfony: '8.1' }
+    steps:
+      - uses: actions/checkout@v4
+      - uses: shivammathur/setup-php@v2
+        with:
+          php-version: ${{ matrix.php }}
+          tools: composer:v2
+          extensions: openssl, mbstring, xml, curl, zip, tokenizer
+          coverage: none
+      - name: Check Composer definition
+        run: composer validate --strict --no-check-publish
+      - name: Pin exact Symfony branch in disposable checkout
+        env:
+          SYMFONY_BRANCH: ${{ matrix.symfony }}
+        run: |
+          php -r '$p=json_decode(file_get_contents("composer.json"),true);foreach($p["require"] as $key=>$value){if(str_starts_with($key,"symfony/"))$p["require"][$key]=getenv("SYMFONY_BRANCH").".*";}file_put_contents("composer.json",json_encode($p,JSON_PRETTY_PRINT).PHP_EOL);'
+      - name: Install pinned released bundle, no plugins/scripts
+        run: composer update --no-interaction --prefer-dist --no-progress --no-plugins --no-scripts
+      - name: Lint fixture and runner
+        run: find tests bin -name '*.php' -print0 | xargs -0 -n1 php -l
+      - name: Differential report (diagnostic)
+        run: php bin/compare.php > /tmp/differential-report.json
+      - name: Summarize differences
+        if: always()
+        run: |
+          php -r '$p="/tmp/differential-report.json";if(!is_file($p))exit(0);$r=json_decode(file_get_contents($p),true);echo "Cases: ".($r["cases"]??0)." Passed: ".($r["passed"]??0)." Failed: ".($r["failed"]??0).PHP_EOL;foreach(($r["tests"]??[]) as $t)if($t["status"]==="FAIL")echo $t["test_id"]." mode=".$t["mode"]." debug=".($t["debug"]?"1":"0")." => ".implode(", ",$t["assertions"]).PHP_EOL;'
+      - name: Enforce security and compatibility requirements
+        run: php bin/compare.php --strict > /tmp/strict-report.json
