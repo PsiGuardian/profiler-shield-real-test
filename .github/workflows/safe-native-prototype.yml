@@ -1,0 +1,53 @@
+name: Experimental Safe Native (test-only) verification
+on:
+  push:
+    branches: [feature/safe-native-prototype-v3]
+  pull_request:
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  prototype:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - { php: '8.3', symfony: '5.4' }
+          - { php: '8.3', symfony: '6.4' }
+          - { php: '8.3', symfony: '7.4' }
+          - { php: '8.4', symfony: '7.4' }
+          - { php: '8.4', symfony: '8.1' }
+    steps:
+      - uses: actions/checkout@v4
+      - uses: shivammathur/setup-php@v2
+        with:
+          php-version: ${{ matrix.php }}
+          tools: composer:v2
+          extensions: openssl, mbstring, xml, curl, zip, tokenizer
+          coverage: none
+      - name: Select Symfony branch only on disposable CI runner
+        env:
+          SYMFONY_BRANCH: ${{ matrix.symfony }}
+        run: |
+          php -r '$p=json_decode(file_get_contents("composer.json"),true);foreach($p["require"] as $k=>$v)if(str_starts_with($k,"symfony/"))$p["require"][$k]=getenv("SYMFONY_BRANCH").".*";file_put_contents("composer.json",json_encode($p,JSON_PRETTY_PRINT).PHP_EOL);'
+      - name: Install published v1 bundle without Composer scripts/plugins
+        run: composer update --no-plugins --no-scripts --no-interaction --prefer-dist --no-progress
+      - name: Lint test-only prototype and runners
+        run: find tests bin -name '*.php' -print0 | xargs -0 -n1 php -l
+      - name: Verify all prototype security and API invariants
+        run: |
+          mkdir -p reports
+          php bin/prototype.php > reports/prototype.json
+      - name: Upload full redacted proof-of-concept results
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: prototype-php${{ matrix.php }}-symfony${{ matrix.symfony }}
+          path: reports/prototype.json
+          if-no-files-found: warn
+          retention-days: 14
+      - name: Strict gate — all 144 probes must pass
+        run: |
+          php -r '$r=json_decode(file_get_contents("reports/prototype.json"),true);if(!is_array($r)||($r["expected_probes"]??0)!==144||($r["observed_probes"]??0)!==144)exit(2);echo "PASS=".($r["passed"]??0)." FAIL=".($r["failed"]??0).PHP_EOL;foreach($r["rows"] as $v)if($v["status"]==="FAIL")echo $v["id"].": ".implode("; ",$v["errors"]).PHP_EOL;exit(($r["failed"]??999)>0?1:0);'
